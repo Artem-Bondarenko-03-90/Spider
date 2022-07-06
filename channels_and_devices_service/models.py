@@ -8,17 +8,26 @@ class Node(models.Model):
     local_number = models.PositiveSmallIntegerField()
     device = models.ForeignKey('cim_service.Device', on_delete=models.PROTECT)
     branches = models.ManyToManyField('Branch', through='Node_Branch', through_fields=('node_id', 'branch_id'))
+    class Meta:
+        verbose_name = 'Узел'
+        verbose_name_plural = 'Узлы'
 
 # Beam
 class Beam(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4(), editable=False)
     in_service = models.BooleanField(default=True)
+    class Meta:
+        verbose_name = 'Пучок'
+        verbose_name_plural = 'Пучки'
 
 # Branch
 class Branch(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4(), editable=False)
     in_service = models.BooleanField(default=True)
     beam = models.ForeignKey(Beam, on_delete=models.PROTECT)
+    class Meta:
+        verbose_name = 'Ветвь'
+        verbose_name_plural = 'Ветви'
 
 # Selector
 class Selector(models.Model):
@@ -26,6 +35,9 @@ class Selector(models.Model):
     short_name = models.CharField(max_length=10)
     name = models.CharField(max_length=150)
     device = models.ForeignKey('cim_service.Device', on_delete=models.PROTECT)
+    class Meta:
+        verbose_name = 'Переключатель'
+        verbose_name_plural = 'Переключатели'
 
 #Position
 class Position(models.Model):
@@ -33,6 +45,9 @@ class Position(models.Model):
     name = models.CharField(max_length=30)
     in_service = models.BooleanField(default=True)
     selector = models.ForeignKey(Selector, on_delete=models.PROTECT)
+    class Meta:
+        verbose_name = 'Положение переключателя'
+        verbose_name_plural = 'Положения переключателей'
 
 #Node_Branch
 class Node_Branch(models.Model):

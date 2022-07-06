@@ -6,12 +6,18 @@ class Substation(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4(), editable=False)
     name = models.CharField(max_length=100)
     is_station = models.BooleanField(default=False)
+    class Meta:
+        verbose_name = 'Энергообьект'
+        verbose_name_plural = 'Энергообъекты'
 
 # Company
 class Company(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4(), editable=False)
     name = models.CharField(max_length=100)
     parent_company = models.ForeignKey('self', on_delete=models.PROTECT)
+    class Meta:
+        verbose_name = 'Компания'
+        verbose_name_plural = 'Компании'
 
 
 # Unit
@@ -52,3 +58,6 @@ class Device(models.Model):
     type = models.CharField(max_length=50, choices=TYPES)
     substation = models.ForeignKey(Substation, on_delete=models.PROTECT)
     beams = models.ManyToManyField('channels_and_devices_service.Beam')
+    class Meta:
+        verbose_name = 'Устройство'
+        verbose_name_plural = 'Устройства'
