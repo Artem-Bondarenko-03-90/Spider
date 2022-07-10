@@ -1,7 +1,8 @@
 from django.urls import path
 
-from cim_service.views import index
+from .views import api_substations, api_substation_detail
 
 urlpatterns = [
-    path('index/', index)
+    path('api/substations/', api_substations),
+    path('api/substations/<uuid:id>/', api_substation_detail),
 ]

@@ -3,7 +3,7 @@ import uuid
 
 # Substation
 class Substation(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4(), editable=False)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100)
     is_station = models.BooleanField(default=False)
     class Meta:
@@ -12,7 +12,7 @@ class Substation(models.Model):
 
 # Company
 class Company(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4(), editable=False)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100)
     parent_company = models.ForeignKey('self', on_delete=models.PROTECT)
     class Meta:
@@ -22,7 +22,7 @@ class Company(models.Model):
 
 # Unit
 class Unit(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4(), editable=False)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     unit_id = models.UUIDField(db_index=True) # в это поле просто копируется id нужной сущности
     TYPES = (
         ('Substation', 'Энергообьект'),
@@ -33,7 +33,7 @@ class Unit(models.Model):
 
 #Permission
 class Permission(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4(), editable=False)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     unit_id = models.ForeignKey(Unit, on_delete=models.CASCADE)
     company_id = models.ForeignKey(Company, on_delete=models.CASCADE)
     TYPES = (
@@ -46,7 +46,7 @@ class Permission(models.Model):
 
 #Device
 class Device(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4(), editable=False)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=200)
     TYPES = (
         ('Rx', 'Приёмник'),
