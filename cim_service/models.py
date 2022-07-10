@@ -14,7 +14,7 @@ class Substation(models.Model):
 class Company(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100)
-    parent_company = models.ForeignKey('self', on_delete=models.PROTECT)
+    parent_company = models.ForeignKey('self', on_delete=models.DO_NOTHING, null=True, default=None)
     class Meta:
         verbose_name = 'Компания'
         verbose_name_plural = 'Компании'
