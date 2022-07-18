@@ -43,6 +43,8 @@ class Permission(models.Model):
         ('Create', 'Создание'),
     )
     type = models.CharField(max_length=10, choices=TYPES)
+    class Meta():
+        unique_together = ('unit_id', 'company_id', 'type')
 
 #Device
 class Device(models.Model):

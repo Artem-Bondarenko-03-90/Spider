@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'channels_and_devices_service.apps.ChannelsAndDevicesServiceConfig',
     'rest_framework',
     'corsheaders',
+    'drf_yasg',
 ]
 
 MIDDLEWARE = [
