@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from .models import Substation, Unit, Company, Permission
+from .models import Substation, Unit, Company, Permission, Device
+
 
 class SubstationSerialiser(serializers.ModelSerializer):
     class Meta:
@@ -20,3 +21,8 @@ class PermissionSerialiser(serializers.ModelSerializer):
     class Meta:
         model = Permission
         fields = ('id','unit_id','company_id', 'type')
+
+class DeviceSerialiser(serializers.ModelSerializer):
+    class Meta:
+        model = Device
+        fields = ('id','name', 'substation', 'type')

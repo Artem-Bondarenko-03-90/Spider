@@ -3,8 +3,9 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
-from .models import Substation, Unit, Company, Permission
-from .serialisers import SubstationSerialiser, CompanySerialiser, PermissionSerialiser
+from .models import Substation, Unit, Company, Permission, Device
+from .serialisers import SubstationSerialiser, CompanySerialiser, PermissionSerialiser, DeviceSerialiser
+
 
 @api_view(['GET', 'POST'])
 def api_substations(request):
@@ -86,7 +87,6 @@ def api_permissions(request):
             #рекурсивно добавим права на чтение для родительских компаний
             set_permission_for_parent_companies(request.data['company_id'], u.id)
 
-
         elif request.data['substation_id'] is None and request.data['device_id'] is not None:
             u = Unit.objects.get(unit_id=request.data['device_id'])
             d = {
@@ -94,6 +94,8 @@ def api_permissions(request):
                 'company_id': request.data['company_id'],
                 'type': request.data['type']
             }
+            set_permission_for_parent_companies(request.data['company_id'], u.id)
+
         elif request.data['device_id'] is None and request.data['substation_id'] is None:
             return Response(status=status.HTTP_400_BAD_REQUEST)
         elif request.data['device_id'] is not None and request.data['substation_id'] is not None:
@@ -120,6 +122,8 @@ def set_permission_for_parent_companies(children_company_id, unit_id):
             set_permission_for_parent_companies(parent_company_id, unit_id)
 
 
+
+
 @api_view(['GET'])
 def api_permissions_by_company_for_substations(request, company_id):
     company = Company.objects.get(id=company_id)
@@ -134,4 +138,55 @@ def api_permissions_by_company_for_substations(request, company_id):
 # получить компанию текущего пользователя
 @api_view(['GET'])
 def api_my_company(request):
+    pass
+
+@api_view(['GET', 'POST'])
+def api_devices(request):
+    if request.method == 'GET':
+        devices = Device.objects.all()
+        serialiser = DeviceSerialiser(devices, many=True)
+        return Response(serialiser.data)
+    elif request.method == 'POST':
+        serialiser = DeviceSerialiser(data=request.data)
+        if serialiser.is_valid():
+            serialiser.save()
+            # создаем запись Unit
+            u = Unit(unit_id = serialiser.data['id'], type = 'Device')
+            u.save()
+            return Response(serialiser.data, status=status.HTTP_201_CREATED)
+        return Response(serialiser.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET', 'PUT', 'DELETE'])
+def api_device_detail(request, id):
+    device = Device.objects.get(id=id)
+    if request.method == 'GET':
+        serialiser = DeviceSerialiser(device)
+        return Response(serialiser.data)
+    elif request.method == 'PUT' or request.method == 'PATCH':
+        serialiser = DeviceSerialiser(device, data=request.data)
+        if serialiser.is_valid():
+            serialiser.save()
+            return Response(serialiser.data)
+        return Response(serialiser.errors, status=status.HTTP_400_BAD_REQUEST)
+    elif request.method == 'DELETE':
+        device.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+@api_view(['GET'])
+def api_devices_by_substation(request, substation_id):
+    s = Substation.objects.get(id=substation_id)
+    devices = Device.objects.filter(substation = s)
+    serialiser = DeviceSerialiser(devices, many=True)
+    return Response(serialiser.data)
+
+@api_view(['GET', 'POST'])
+def api_nodes(request):
+    pass
+
+@api_view(['GET', 'PUT', 'DELETE'])
+def api_node_detail(request, id):
+    pass
+
+@api_view(['POST'])
+def api_nodes_by_device(request, device_id):
     pass

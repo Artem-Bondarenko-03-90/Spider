@@ -56,6 +56,7 @@ class Device(models.Model):
         ('Load_shedding', 'САОН'),
         ('Frequency_load_shedding', 'АЧР'),
         ('Stability_control_automatic', 'АПНУ'),
+        ('Over_power_automatic', 'АОПО'),
     )
     type = models.CharField(max_length=50, choices=TYPES)
     substation = models.ForeignKey(Substation, on_delete=models.PROTECT)
