@@ -4,8 +4,8 @@ import uuid
 # Node
 class Node(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=150)
-    local_number = models.PositiveSmallIntegerField()
+    name = models.CharField(max_length=150, null=True)
+    local_number = models.PositiveSmallIntegerField(null=True)
     device = models.ForeignKey('cim_service.Device', on_delete=models.PROTECT)
     branches = models.ManyToManyField('Branch', through='Node_Branch', through_fields=('node_id', 'branch_id'))
     class Meta:

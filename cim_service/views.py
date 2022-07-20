@@ -178,15 +178,3 @@ def api_devices_by_substation(request, substation_id):
     devices = Device.objects.filter(substation = s)
     serialiser = DeviceSerialiser(devices, many=True)
     return Response(serialiser.data)
-
-@api_view(['GET', 'POST'])
-def api_nodes(request):
-    pass
-
-@api_view(['GET', 'PUT', 'DELETE'])
-def api_node_detail(request, id):
-    pass
-
-@api_view(['POST'])
-def api_nodes_by_device(request, device_id):
-    pass
