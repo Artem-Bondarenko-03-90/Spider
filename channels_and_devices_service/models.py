@@ -55,8 +55,8 @@ class Node_Branch(models.Model):
     node_id = models.ForeignKey(Node, on_delete=models.CASCADE)
     branch_id = models.ForeignKey(Branch, on_delete=models.CASCADE)
     TYPES = (
-        ('input', 'Вход'),
-        ('output', 'Выход'),
+        ('direct', 'Прямо'),
+        ('reverse', 'Обратно'),
     )
     type = models.CharField(max_length=10, choices=TYPES)
 

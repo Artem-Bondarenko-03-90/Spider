@@ -5,6 +5,7 @@ from rest_framework.response import Response
 
 from .models import Substation, Unit, Company, Permission, Device
 from .serialisers import SubstationSerialiser, CompanySerialiser, PermissionSerialiser, DeviceSerialiser
+from channels_and_devices_service.views import beams_by_device
 
 
 @api_view(['GET', 'POST'])
@@ -178,3 +179,4 @@ def api_devices_by_substation(request, substation_id):
     devices = Device.objects.filter(substation = s)
     serialiser = DeviceSerialiser(devices, many=True)
     return Response(serialiser.data)
+
