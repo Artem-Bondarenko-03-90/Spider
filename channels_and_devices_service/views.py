@@ -260,3 +260,44 @@ def api_table_for_device(request, device_id):
     data["beams"] = beam_list
 
     return JsonResponse(data)
+
+@api_view(['GET'])
+def api_route_by_node(request, node_id):
+    n = Node.objects.get(id=node_id)
+    data = {}
+    data["segments"] = get_dict_route_by_device(n, 1)
+    return JsonResponse(data)
+
+def get_dict_route_by_device(node, level):
+    segment_list=[]
+    d = node.device
+    sub = d.substation
+    segment_dict = {
+        "start_node_id": node.id,
+        "start_node_name": node.name,
+        "start_node_local_number": node.local_number,
+        "start_device_id": d.id,
+        "start_device_name": d.name,
+        "start_substation_id": sub.id,
+        "start_substation_name": sub.name
+    }
+
+    q = Q(node__id=node.id) & Q(node_branch__type='direct')
+    out_branches = Branch.objects.filter(q)
+    #branches_list = []
+    for out_br in out_branches:
+        next_n = Node.objects.filter(branches__id = out_br.id).exclude(id=node.id).first()
+        next_d = next_n.device
+        next_sub = next_d.substation
+        segment_dict["end_node_id"] = next_n.id
+        segment_dict["end_node_name"] = next_n.name
+        segment_dict["end_node_local_number"] = next_n.local_number
+        segment_dict["end_device_id"] = next_d.id
+        segment_dict["end_device_name"] = next_d.name
+        segment_dict["end_subsnation_id"] = next_sub.id
+        segment_dict["end_subsnation_name"] = next_sub.name
+        segment_dict["in_service"] = out_br.in_service
+        segment_dict["level"] = level
+        segment_list.append(segment_dict)
+        segment_list.append(get_dict_route_by_device(next_n, level+1))
+    return segment_list
