@@ -45,6 +45,7 @@ class Position(models.Model):
     name = models.CharField(max_length=30)
     in_service = models.BooleanField(default=True)
     selector = models.ForeignKey(Selector, on_delete=models.PROTECT)
+    changed_timestamp = models.DateTimeField(null=True)
     class Meta:
         verbose_name = 'Положение переключателя'
         verbose_name_plural = 'Положения переключателей'

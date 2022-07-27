@@ -1,10 +1,12 @@
+import datetime
+
 from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from rest_framework import status
 from rest_framework.decorators import api_view
-from .models import Node, Beam, Branch
-from .serialisers import NodeSerialiser, BeamSerialiser
+from .models import Node, Beam, Branch, Selector, Position
+from .serialisers import NodeSerialiser, BeamSerialiser, SelectorSerialiser
 from rest_framework.response import Response
 
 from cim_service.models import Device
@@ -347,6 +349,54 @@ def get_in_route_by_device(node, level):
         list_next_segments = get_in_route_by_device(next_n, level-1)
         for ns in list_next_segments:
             segment_list.append(ns)
-
-
     return segment_list
+
+@api_view(['GET', 'POST'])
+def api_selectors(request):
+    if request.method == 'GET':
+        selectors = Selector.objects.all()
+        serialiser = SelectorSerialiser(selectors, many=True)
+        return Response(serialiser.data)
+    elif request.method == 'POST':
+        serialiser = SelectorSerialiser(data=request.data)
+        if serialiser.is_valid():
+            serialiser.save()
+            return Response(serialiser.data, status=status.HTTP_201_CREATED)
+        return Response(serialiser.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+def api_selectors_by_device(request, device_id):
+    selectors = Selector.objects.filter(device__id = device_id)
+    serialiser = SelectorSerialiser(selectors, many=True)
+    return Response(serialiser.data)
+
+@api_view(['GET', 'PUT', 'DELETE', 'PATCH'])
+def api_selector_detail(request, id):
+    selector = Selector.objects.get(id=id)
+    if request.method == 'GET':
+        serialiser = SelectorSerialiser(selector)
+        return Response(serialiser.data)
+    elif request.method == 'PUT' or request.method == 'PATCH':
+        serialiser = SelectorSerialiser(selector, data=request.data)
+        if serialiser.is_valid():
+            serialiser.save()
+            return Response(serialiser.data)
+        return Response(serialiser.errors, status=status.HTTP_400_BAD_REQUEST)
+    elif request.method == 'DELETE':
+        selector.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+def positions_by_selector(selector_id):
+    positions = Position.objects.filter(selector__id = selector_id)
+    return positions
+
+def activate_position(position):
+    next_positions = Position.objects.filter(selector = position.selector).exclude(id = position.id)
+    timestamp = datetime.datetime.now()
+    for n_pos in next_positions:
+        n_pos.in_service = False
+        n_pos.changed_timestamp = timestamp
+        n_pos.save()
+    position.in_service = True
+    position.changed_timestamp = timestamp
+    position.save()
