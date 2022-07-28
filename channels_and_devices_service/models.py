@@ -46,6 +46,7 @@ class Position(models.Model):
     in_service = models.BooleanField(default=True)
     selector = models.ForeignKey(Selector, on_delete=models.PROTECT)
     changed_timestamp = models.DateTimeField(null=True)
+    branches = models.ManyToManyField('Branch', through='Position_Branch', through_fields=('position', 'branch'))
     class Meta:
         verbose_name = 'Положение переключателя'
         verbose_name_plural = 'Положения переключателей'

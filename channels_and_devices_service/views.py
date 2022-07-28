@@ -1,12 +1,13 @@
 import datetime
 
 from django.db.models import Q
+from django.db.transaction import atomic
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from rest_framework import status
 from rest_framework.decorators import api_view
 from .models import Node, Beam, Branch, Selector, Position
-from .serialisers import NodeSerialiser, BeamSerialiser, SelectorSerialiser
+from .serialisers import NodeSerialiser, BeamSerialiser, SelectorSerialiser, SelectorPositionSerialiser
 from rest_framework.response import Response
 
 from cim_service.models import Device
@@ -386,10 +387,40 @@ def api_selector_detail(request, id):
         selector.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+@api_view(['GET', 'POST'])
+def api_positions(request):
+    if request.method == 'GET':
+        positions = Position.objects.all()
+        serialiser = SelectorPositionSerialiser(positions, many=True)
+        return Response(serialiser.data)
+    elif request.method == 'POST':
+        serialiser = SelectorPositionSerialiser(data=request.data)
+        if serialiser.is_valid():
+            serialiser.save()
+            return Response(serialiser.data, status=status.HTTP_201_CREATED)
+        return Response(serialiser.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET', 'PUT', 'DELETE', 'PATCH'])
+def api_position_detail(request, id):
+    position = Position.objects.get(id=id)
+    if request.method == 'GET':
+        serialiser = SelectorPositionSerialiser(position)
+        return Response(serialiser.data)
+    elif request.method == 'PUT' or request.method == 'PATCH':
+        serialiser = SelectorPositionSerialiser(position, data=request.data)
+        if serialiser.is_valid():
+            serialiser.save()
+            return Response(serialiser.data)
+        return Response(serialiser.errors, status=status.HTTP_400_BAD_REQUEST)
+    elif request.method == 'DELETE':
+        position.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 def positions_by_selector(selector_id):
     positions = Position.objects.filter(selector__id = selector_id)
     return positions
 
+@atomic
 def activate_position(position):
     next_positions = Position.objects.filter(selector = position.selector).exclude(id = position.id)
     timestamp = datetime.datetime.now()
@@ -397,6 +428,47 @@ def activate_position(position):
         n_pos.in_service = False
         n_pos.changed_timestamp = timestamp
         n_pos.save()
+        q = Q(position__id=n_pos.id) & Q(position_branch__type='on')
+        branch_on_set = Branch.objects.filter(q)
+        for br_on in branch_on_set:
+            br_on.in_service = True
+            br_on.save()
+        q = Q(position__id=n_pos.id) & Q(position_branch__type='off')
+        branch_off_set = Branch.objects.filter(q)
+        for br_off in branch_off_set:
+            br_off.in_service = True
+            br_off.save()
     position.in_service = True
     position.changed_timestamp = timestamp
     position.save()
+    q = Q(position__id=position.id) & Q(position_branch__type='on')
+    branch_on_set = Branch.objects.filter(q)
+    for br_on in branch_on_set:
+        br_on.in_service = True
+        br_on.save()
+    q = Q(position__id=position.id) & Q(position_branch__type='off')
+    branch_off_set = Branch.objects.filter(q)
+    for br_off in branch_off_set:
+        br_off.in_service = True
+        br_off.save()
+
+@api_view(['POST'])
+def api_connect_position_branch(request):
+    position_id = request.data['position_id']
+    branch_id = request.data['branch_id']
+    state = request.data['state']
+    p = Position.objects.get(id=position_id)
+    br = Branch.objects.get(id=branch_id)
+    if p != None and br != None:
+        if state == 'on':
+            p.branches.add(br, through_defaults={'type': 'on'})
+        elif state == 'off':
+            p.branches.add(br, through_defaults={'type': 'off'})
+        return Response(status=status.HTTP_200_OK)
+    return Response(status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+def api_activate_position(request, position_id):
+    p = Position.objects.get(id=position_id)
+    activate_position(p)
+    return Response(status=status.HTTP_200_OK)
