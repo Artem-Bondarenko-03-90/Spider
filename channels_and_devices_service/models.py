@@ -44,6 +44,7 @@ class Position(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=30)
     in_service = models.BooleanField(default=True)
+    is_normal = models.BooleanField(default=False)
     selector = models.ForeignKey(Selector, on_delete=models.PROTECT)
     changed_timestamp = models.DateTimeField(null=True)
     branches = models.ManyToManyField('Branch', through='Position_Branch', through_fields=('position', 'branch'))
@@ -65,8 +66,8 @@ class Node_Branch(models.Model):
 #Position_Branch
 class Position_Branch(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    position_id = models.ForeignKey(Position, on_delete=models.CASCADE)
-    branch_id = models.ForeignKey(Branch, on_delete=models.CASCADE)
+    position = models.ForeignKey(Position, on_delete=models.CASCADE)
+    branch = models.ForeignKey(Branch, on_delete=models.CASCADE)
     TYPES = (
         ('on', 'Вкл'),
         ('off', 'Откл'),

@@ -6,7 +6,7 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from rest_framework import status
 from rest_framework.decorators import api_view
-from .models import Node, Beam, Branch, Selector, Position
+from .models import Node, Beam, Branch, Selector, Position, Position_Branch
 from .serialisers import NodeSerialiser, BeamSerialiser, SelectorSerialiser, SelectorPositionSerialiser
 from rest_framework.response import Response
 
@@ -472,3 +472,58 @@ def api_activate_position(request, position_id):
     p = Position.objects.get(id=position_id)
     activate_position(p)
     return Response(status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+def api_select_normal_state(request, position_id):
+    p = Position.objects.get(id=position_id)
+    select_normal_state(p)
+    return Response(status=status.HTTP_200_OK)
+
+@atomic
+def select_normal_state(position):
+    next_positions = Position.objects.filter(selector=position.selector).exclude(id=position.id)
+    #timestamp = datetime.datetime.now()
+    for n_pos in next_positions:
+        n_pos.is_normal = False
+        n_pos.save()
+    position.is_normal = True
+    position.save()
+
+
+@api_view(['GET'])
+def api_selectors_for_device(request, device_id):
+    d = Device.objects.get(id=device_id)
+
+    data = {}
+    selectors = Selector.objects.filter(device=d)
+    selectors_list = []
+    for sel in selectors:
+        selector_dict ={
+            "selector_id": sel.id,
+            "selector_short_name": sel.short_name,
+            "selector_name": sel.name
+        }
+        positions = Position.objects.filter(selector=sel)
+        positions_list=[]
+        for pos in positions:
+            position_dict = {
+                "position_id": pos.id,
+                "position_name": pos.name,
+                "changed_timestamp": pos.changed_timestamp,
+                "in_service": pos.in_service,
+                "is_normal": pos.is_normal
+            }
+            branches = Branch.objects.filter(position__id = pos.id)
+            branches_list = []
+            for br in branches:
+                br_dict = {
+                    "branch_id": br.id,
+                    "type": Position_Branch.objects.filter(position = pos).filter(branch = br).first().type
+                }
+                branches_list.append(br_dict)
+            position_dict["branches"] = branches_list
+            positions_list.append(position_dict)
+        selector_dict["positions"] = positions_list
+        selectors_list.append(selector_dict)
+    data["selectors"] = selectors_list
+    return JsonResponse(data)

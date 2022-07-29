@@ -3,7 +3,8 @@ from django.urls import path
 
 from .views import api_nodes, api_node_detail, api_nodes_by_device, api_create_beam, api_create_branch, \
     api_table_for_device, api_route_by_node, api_selectors, api_selectors_by_device, api_selector_detail, api_positions, \
-    api_position_detail, api_connect_position_branch, api_activate_position
+    api_position_detail, api_connect_position_branch, api_activate_position, api_select_normal_state, \
+    api_selectors_for_device
 
 urlpatterns = [
     path('api/nodes/', api_nodes),
@@ -19,5 +20,7 @@ urlpatterns = [
     path('api/positions/', api_positions),
     path('api/positions/<uuid:id>', api_position_detail),
     path('api/connect_position_branch/', api_connect_position_branch),
-    path('api/activate_position/<uuid:position_id>', api_activate_position)
+    path('api/activate_position/<uuid:position_id>', api_activate_position),
+    path('api/select_normal_state/<uuid:position_id>', api_select_normal_state),
+    path('api/selectors_for_device/<uuid:device_id>', api_selectors_for_device)
 ]
