@@ -428,16 +428,16 @@ def activate_position(position):
         n_pos.in_service = False
         n_pos.changed_timestamp = timestamp
         n_pos.save()
-        q = Q(position__id=n_pos.id) & Q(position_branch__type='on')
-        branch_on_set = Branch.objects.filter(q)
-        for br_on in branch_on_set:
-            br_on.in_service = True
-            br_on.save()
-        q = Q(position__id=n_pos.id) & Q(position_branch__type='off')
-        branch_off_set = Branch.objects.filter(q)
-        for br_off in branch_off_set:
-            br_off.in_service = True
-            br_off.save()
+    #q = Q(position__id=position.id) & Q(position_branch__type='on')
+    #branch_on_set = Branch.objects.filter(q)
+    #for br_on in branch_on_set:
+    #    br_on.in_service = True
+    #    br_on.save()
+    #q = Q(position__id=position.id) & Q(position_branch__type='off')
+    #branch_off_set = Branch.objects.filter(q)
+    #for br_off in branch_off_set:
+    #    br_off.in_service = False
+    #    br_off.save()
     position.in_service = True
     position.changed_timestamp = timestamp
     position.save()
@@ -449,7 +449,7 @@ def activate_position(position):
     q = Q(position__id=position.id) & Q(position_branch__type='off')
     branch_off_set = Branch.objects.filter(q)
     for br_off in branch_off_set:
-        br_off.in_service = True
+        br_off.in_service = False
         br_off.save()
 
 @api_view(['POST'])
