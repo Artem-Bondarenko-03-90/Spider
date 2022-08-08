@@ -110,3 +110,5 @@ class Feeder(Equipment):
     )
     category = models.IntegerField(choices=CATEGORIES)
     equipment = models.OneToOneField(Equipment, on_delete=models.CASCADE, parent_link=True)
+
+

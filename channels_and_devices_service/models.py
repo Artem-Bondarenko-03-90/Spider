@@ -2,6 +2,9 @@ from django.db import models
 import uuid
 
 # Node
+from cim_service.models import Equipment
+
+
 class Node(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=150, null=True)
@@ -73,3 +76,16 @@ class Position_Branch(models.Model):
         ('off', 'Откл'),
     )
     type = models.CharField(max_length=5, choices=TYPES, default='off')
+
+
+# EquipmentControlAction
+class EquipmentControlAction(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    node = models.ForeignKey(Node, on_delete=models.CASCADE)
+    equipment = models.ForeignKey(Equipment, on_delete=models.CASCADE)
+    ACTION_TYPES = (
+        ('turn_on', 'Включение'),
+        ('turn_off', 'Отключение'),
+        ('generation_step_down', 'Ступенчатое снижение генерации')
+    )
+    action_type = models.CharField(max_length=40, choices=ACTION_TYPES, default='turn_off')
