@@ -11,6 +11,7 @@ class Node(models.Model):
     local_number = models.PositiveSmallIntegerField(null=True)
     device = models.ForeignKey('cim_service.Device', on_delete=models.PROTECT)
     branches = models.ManyToManyField('Branch', through='Node_Branch', through_fields=('node_id', 'branch_id'))
+    equipments = models.ManyToManyField('Equipment', through='EquipmentControlAction', through_fields=('node_id', 'equipment_id'))
     class Meta:
         verbose_name = 'Узел'
         verbose_name_plural = 'Узлы'

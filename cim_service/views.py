@@ -3,8 +3,9 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
-from .models import Substation, Unit, Company, Permission, Device, Switchgear
-from .serialisers import SubstationSerialiser, CompanySerialiser, PermissionSerialiser, DeviceSerialiser
+from .models import Substation, Unit, Company, Permission, Device, Switchgear, Equipment
+from .serialisers import SubstationSerialiser, CompanySerialiser, PermissionSerialiser, DeviceSerialiser, \
+    SwitchgearSerialiser, EquipmentSerialiser
 from channels_and_devices_service.views import beams_by_device
 
 
@@ -185,15 +186,79 @@ def api_devices_by_substation(request, substation_id):
 def api_switchgear(request):
     if request.method == 'GET':
         switchgears = Switchgear.objects.all()
-        serialiser = DeviceSerialiser(devices, many=True)
+        serialiser = SwitchgearSerialiser(switchgears, many=True)
         return Response(serialiser.data)
     elif request.method == 'POST':
-        serialiser = DeviceSerialiser(data=request.data)
+        serialiser = SwitchgearSerialiser(data=request.data)
         if serialiser.is_valid():
             serialiser.save()
             # создаем запись Unit
-            u = Unit(unit_id = serialiser.data['id'], type = 'Device')
+            u = Unit(unit_id = serialiser.data['id'], type = 'Switchergear')
             u.save()
             return Response(serialiser.data, status=status.HTTP_201_CREATED)
         return Response(serialiser.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET', 'PUT', 'DELETE'])
+def api_switchgear_detail(request, id):
+    sw = Switchgear.objects.get(id=id)
+    if request.method == 'GET':
+        serialiser = SwitchgearSerialiser(sw)
+        return Response(serialiser.data)
+    elif request.method == 'PUT' or request.method == 'PATCH':
+        serialiser = SwitchgearSerialiser(sw, data=request.data)
+        if serialiser.is_valid():
+            serialiser.save()
+            return Response(serialiser.data)
+        return Response(serialiser.errors, status=status.HTTP_400_BAD_REQUEST)
+    elif request.method == 'DELETE':
+        sw.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+@api_view(['GET'])
+def api_switchgear_by_substation(request, substation_id):
+    s = Substation.objects.get(id=substation_id)
+    switchgears = Switchgear.objects.filter(substation = s)
+    serialiser = SwitchgearSerialiser(switchgears, many=True)
+    return Response(serialiser.data)
+
+
+@api_view(['GET', 'POST'])
+def api_equipment(request):
+    if request.method == 'GET':
+        equipments = Equipment.objects.all()
+        serialiser = EquipmentSerialiser(equipments, many=True)
+        return Response(serialiser.data)
+    elif request.method == 'POST':
+        serialiser = EquipmentSerialiser(data=request.data)
+        if serialiser.is_valid():
+            serialiser.save()
+            return Response(serialiser.data, status=status.HTTP_201_CREATED)
+        return Response(serialiser.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET', 'PUT', 'DELETE'])
+def api_equipment_detail(request, id):
+    e = Equipment.objects.get(id=id)
+    if request.method == 'GET':
+        serialiser = EquipmentSerialiser(e)
+        return Response(serialiser.data)
+    elif request.method == 'PUT' or request.method == 'PATCH':
+        serialiser = EquipmentSerialiser(e, data=request.data)
+        if serialiser.is_valid():
+            serialiser.save()
+            return Response(serialiser.data)
+        return Response(serialiser.errors, status=status.HTTP_400_BAD_REQUEST)
+    elif request.method == 'DELETE':
+        e.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(['GET'])
+def api_equipment_by_switchgear(request, switchgear_id):
+    sw = Switchgear.objects.get(id=switchgear_id)
+    equipments = Equipment.objects.filter(switchgear = sw)
+    serialiser = EquipmentSerialiser(equipments, many=True)
+    return Response(serialiser.data)
+
+
+
 

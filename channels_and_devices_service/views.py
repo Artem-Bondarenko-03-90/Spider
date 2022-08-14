@@ -12,6 +12,8 @@ from rest_framework.response import Response
 
 from cim_service.models import Device
 from .routes import Route
+from ..cim_service.models import Equipment
+
 
 @api_view(['GET', 'POST'])
 def api_nodes(request):
@@ -405,8 +407,6 @@ def get_in_route_by_device(node, level):
     d = node.device
     sub = d.substation
     segment_dict = {}
-    # i = 0
-    # branchChain_2 = [[]]
     # обработка ВХОДЯЩИХ ветвей для запрошенного узла
     q = Q(node__id=node.id) & Q(node_branch__type='reverse')
     in_branches = Branch.objects.filter(q)
@@ -623,3 +623,15 @@ def api_selectors_for_device(request, device_id):
         selectors_list.append(selector_dict)
     data["selectors"] = selectors_list
     return JsonResponse(data)
+
+@api_view(['POST'])
+def api_create_equipment_control_action(request):
+    node_id = request.data['node_id']
+    equipment_id = request.data['equipment_id']
+    action_type = request.data['action_type']
+    if node_id is not None and equipment_id is not None:
+        n = Node.objects.get(id=node_id)
+        e = Equipment.objects.create(id=equipment_id)
+        n.equipments.add(e, through_defaults={'action_type': action_type})
+        return Response(status=status.HTTP_200_OK)
+    return Response(status=status.HTTP_400_BAD_REQUEST)
