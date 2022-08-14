@@ -11,7 +11,7 @@ from .serialisers import NodeSerialiser, BeamSerialiser, SelectorSerialiser, Sel
 from rest_framework.response import Response
 
 from cim_service.models import Device
-
+from .routes import Route
 
 @api_view(['GET', 'POST'])
 def api_nodes(request):
@@ -268,56 +268,60 @@ def api_table_for_device(request, device_id):
 def api_route_by_node(request, node_id):
     n = Node.objects.get(id=node_id)
     data = {}
-    data["segments"] = get_out_route_by_device(n, 1, [[]])
+    data["segments"] = get_out_route_by_device(n, 1)
     for ns in get_in_route_by_device(n, -1):
         data["segments"].append(ns)
 
+    start_nodes = []
+    for s in data["segments"]:
+        if s["is_start_segment"]:
+            start_nodes.append(s["start_node_id"])
+
     branch_states={}
-    for route in route_state(n, [[]]):
-        chainString=""
-        chain = recursive_get_list(route)
-        condition_route=True
-        condition_route_2 = True
-        routeBranches=[]
-        for br in chain:
-            routeBranches.append(Branch.objects.get(id=br))
-            if Branch.objects.get(id=br).in_service == False:
-                condition_route_2=False
-        if condition_route_2 == False:
-            for br in chain:
-                routeBranches.append(Branch.objects.get(id=br))
-                if Branch.objects.get(id=br).in_service == False:
-                    condition_route=False
-                if      condition_route == True and Branch.objects.get(id=br).in_service == True:
-                    branch_states[br]=True
-                elif    condition_route == False and Branch.objects.get(id=br).in_service == True:
-                    branch_states[br] = False
-                elif condition_route == True and Branch.objects.get(id=br).in_service == False:
-                    branch_states[br] = False
-                elif condition_route == False and Branch.objects.get(id=br).in_service == False:
-                    branch_states[br] = False
-        elif condition_route_2 == True:
-            for br in chain:
-                routeBranches.append(Branch.objects.get(id=br))
-                if Branch.objects.get(id=br).in_service == False:
-                    condition_route=False
-                if      condition_route == True and Branch.objects.get(id=br).in_service == True:
-                    branch_states[br]=True
-                elif    condition_route == False and Branch.objects.get(id=br).in_service == True:
-                    branch_states[br] = False
-                elif condition_route == True and Branch.objects.get(id=br).in_service == False:
-                    branch_states[br] = False
-                elif condition_route == False and Branch.objects.get(id=br).in_service == False:
-                    branch_states[br] = False
-    for  s in data["segments"]:
-        print(s['branch_id'])
-        for k in branch_states.keys():
-            if s['branch_id'] == k:
-                s['in_service'] = branch_states[k]
+    for s_n in start_nodes:
+        r = Route()
+        for route in getAllRoudsByStartNode(Node.objects.get(id=s_n), [r]):
+            condition_route=True
+            condition_route_2 = True
+            routeBranches = []
+            routeBranchIds=route.cutFirstNull().getBranchListByRoute()
+            for brId in routeBranchIds:
+                routeBranches.append(Branch.objects.get(id=brId))
+                if routeBranches[len(routeBranches)-1].in_service == False:
+                    condition_route_2=False
+            if condition_route_2 == False:
+                for br in routeBranches:
+                    if br.in_service == False:
+                        condition_route=False
+                    if      condition_route == True and br.in_service == True:
+                        branch_states[br.id]=True
+                    elif    condition_route == False and br.in_service == True:
+                        branch_states[br.id] = False
+                    elif condition_route == True and br.in_service == False:
+                        branch_states[br.id] = False
+                    elif condition_route == False and br.in_service == False:
+                        branch_states[br.id] = False
+            elif condition_route_2 == True:
+                for br in routeBranches:
+                    if br.in_service == False:
+                        condition_route=False
+                    if      condition_route == True and br.in_service == True:
+                        branch_states[br.id]=True
+                    elif    condition_route == False and br.in_service == True:
+                        branch_states[br.id] = False
+                    elif condition_route == True and br.in_service == False:
+                        branch_states[br.id] = False
+                    elif condition_route == False and br.in_service == False:
+                        branch_states[br.id] = False
+        for  s in data["segments"]:
+            for k in branch_states.keys():
+                if s['branch_id'] == k:
+                    s['in_service'] = branch_states[k]
+
 
     return JsonResponse(data)
 
-def get_out_route_by_device(node, level, branchChain):
+def get_out_route_by_device(node, level):
     segment_list=[]
     d = node.device
     sub = d.substation
@@ -325,8 +329,8 @@ def get_out_route_by_device(node, level, branchChain):
     # обработка ИСХОДЯЩИХ ветвей для запрошенного узла
     q = Q(node__id=node.id) & Q(node_branch__type='direct')
     out_branches = Branch.objects.filter(q)
-    i=0
-    branchChain_2=[[]]
+    #i=0
+    #branchChain_2=[[]]
     for out_br in out_branches:
         next_n = Node.objects.filter(branches__id = out_br.id).exclude(id=node.id).first()
         next_d = next_n.device
@@ -346,62 +350,63 @@ def get_out_route_by_device(node, level, branchChain):
         segment_dict["end_subsnation_id"] = next_sub.id
         segment_dict["end_subsnation_name"] = next_sub.name
         segment_dict["branch_id"] = out_br.id
-        #segment_dict["in_service"] = False
         if sub.id == next_sub.id:
             segment_dict["type"] = "internal"
         else:
             segment_dict["type"] = "external"
         segment_dict["level"] = level
+        q1 = Q(node__id=node.id) & Q(node_branch__type='reverse')
+        if Branch.objects.filter(q1).count() == 0:
+            segment_dict["is_start_segment"] = True
+        else:
+            segment_dict["is_start_segment"] = False
         segment_list.append(segment_dict.copy())
-        if i>0:
-            branchChain_2.append(branchChain[0].copy())
-        branchChain_2[i].append(out_br.id)
-        list_next_segments = get_out_route_by_device(next_n, level+1, [branchChain_2[i]])
+        # if i>0:
+        #     branchChain_2.append(branchChain[0].copy())
+        # branchChain_2[i].append(out_br.id)
+        list_next_segments = get_out_route_by_device(next_n, level+1)
         for ns in list_next_segments:
             segment_list.append(ns)
 
-        i += 1
+        #i += 1
     return segment_list
 
 
-def route_state(node, branchChain):
-    branch_list=[]
+def getAllRoudsByStartNode(node, route_list):
     q = Q(node__id=node.id) & Q(node_branch__type='direct')
     out_branches = Branch.objects.filter(q)
     i = 0
-    branchChain_2 = [[]]
+    route_list_2 = []
+    for r in route_list:
+        r1=r.copy()
+        route_list_2.append(r1)
+    n=0
     for out_br in out_branches:
         next_n = Node.objects.filter(branches__id=out_br.id).exclude(id=node.id).first()
         if i>0:
-            branchChain_2.append(branchChain[0].copy())
-        branchChain_2[i].append(out_br.id)
-        #branch_list[i].append(out_br.id)
-        #print(branchChain_2)
-        #print(i)
-        list_next_segments = route_state(next_n, branchChain_2[i])
+            r2=route_list_2[0].copy()
+            route_list.append(r2)
+            n = len(route_list)-1
+        route_list[n].append(out_br.id)
+        list_next_segments = getAllRoudsByStartNode(next_n, [route_list[n]])
+        i1=0
         for ns in list_next_segments:
-            #print(ns)
-            if ns != []:
-
-                branchChain_2[i].append(ns)
-
+            if i1 > 0:
+                route_list.append(ns.copy())
+            else:
+                route_list[n] = ns
+            i1 += 1
         i += 1
-    return branchChain_2
+    return route_list
 
-def recursive_get_list(chain):
-    branch_list = []
-    branch_list.append(chain[0])
-    if len(chain) > 1:
-        list = recursive_get_list(chain[1])
-        for l in list:
-            branch_list.append(l)
-    return branch_list
 
 def get_in_route_by_device(node, level):
     segment_list=[]
     d = node.device
     sub = d.substation
     segment_dict = {}
+    # i = 0
+    # branchChain_2 = [[]]
     # обработка ВХОДЯЩИХ ветвей для запрошенного узла
     q = Q(node__id=node.id) & Q(node_branch__type='reverse')
     in_branches = Branch.objects.filter(q)
@@ -429,7 +434,15 @@ def get_in_route_by_device(node, level):
         else:
             segment_dict["type"] = "external"
         segment_dict["level"] = level
+        q1 = Q(node__id=next_n.id) & Q(node_branch__type='reverse')
+        if Branch.objects.filter(q1).count() == 0:
+            segment_dict["is_start_segment"] = True
+        else:
+            segment_dict["is_start_segment"] = False
         segment_list.append(segment_dict.copy())
+        # if i>0:
+        #     branchChain_2.append(branchChain[0].copy())
+        # branchChain_2[i].append(in_br.id)
         list_next_segments = get_in_route_by_device(next_n, level-1)
         for ns in list_next_segments:
             segment_list.append(ns)

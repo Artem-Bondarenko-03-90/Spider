@@ -3,7 +3,7 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
-from .models import Substation, Unit, Company, Permission, Device
+from .models import Substation, Unit, Company, Permission, Device, Switchgear
 from .serialisers import SubstationSerialiser, CompanySerialiser, PermissionSerialiser, DeviceSerialiser
 from channels_and_devices_service.views import beams_by_device
 
@@ -179,4 +179,21 @@ def api_devices_by_substation(request, substation_id):
     devices = Device.objects.filter(substation = s)
     serialiser = DeviceSerialiser(devices, many=True)
     return Response(serialiser.data)
+
+
+@api_view(['GET', 'POST'])
+def api_switchgear(request):
+    if request.method == 'GET':
+        switchgears = Switchgear.objects.all()
+        serialiser = DeviceSerialiser(devices, many=True)
+        return Response(serialiser.data)
+    elif request.method == 'POST':
+        serialiser = DeviceSerialiser(data=request.data)
+        if serialiser.is_valid():
+            serialiser.save()
+            # создаем запись Unit
+            u = Unit(unit_id = serialiser.data['id'], type = 'Device')
+            u.save()
+            return Response(serialiser.data, status=status.HTTP_201_CREATED)
+        return Response(serialiser.errors, status=status.HTTP_400_BAD_REQUEST)
 
