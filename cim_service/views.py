@@ -1,20 +1,31 @@
+from django.db.models import Q
 from django.http import JsonResponse
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
-from .models import Substation, Unit, Company, Permission, Device, Switchgear, Equipment
-from .serialisers import SubstationSerialiser, CompanySerialiser, PermissionSerialiser, DeviceSerialiser, \
-    SwitchgearSerialiser, EquipmentSerialiser
+from .models import Substation, Unit, Company, Permission, Device, Switchgear, Equipment, Profile
+from .serialisers import SubstationSerialiser, CompanySerialiser, DeviceSerialiser, \
+    SwitchgearSerialiser, EquipmentSerialiser, PermissionSerialiser, UserSerialiser
 from channels_and_devices_service.views import beams_by_device
+from django.contrib.auth.models import User
 
 
 @api_view(['GET', 'POST'])
 def api_substations(request):
     if request.method == 'GET':
-        substations = Substation.objects.all()
-        serialiser_substation = SubstationSerialiser(substations, many=True)
-        return Response(serialiser_substation.data)
+        user_company = my_company(request.user)
+        units_dict = get_ls_units_with_permission(user_company, 'Substation')
+        data = {"substations": []}
+        for u in units_dict.keys():
+            s = Substation.objects.get(id=u)
+            sub_dict={}
+            sub_dict["id"]=s.id
+            sub_dict["name"] = s.name
+            sub_dict["is_station"] = s.is_station
+            sub_dict["permission"] = units_dict[u]
+            data["substations"].append(sub_dict)
+        return JsonResponse(data)
     elif request.method == 'POST':
         serialiser_substation = SubstationSerialiser(data=request.data)
         if serialiser_substation.is_valid():
@@ -22,7 +33,7 @@ def api_substations(request):
             # создаем запись Unit
             u = Unit(unit_id = serialiser_substation.data['id'], type = 'Substation')
             u.save()
-            #print(serialiser_substation.data['id'])
+
             return Response(serialiser_substation.data, status=status.HTTP_201_CREATED)
         return Response(serialiser_substation.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -79,68 +90,72 @@ def api_permissions(request):
         serialiser = PermissionSerialiser(p, many=True)
         return Response(serialiser.data)
     elif request.method == 'POST':
-        if request.data['device_id'] is None and request.data['substation_id'] is not None:
-            u = Unit.objects.get(unit_id=request.data['substation_id'])
-            d = {
-                    'unit_id': u.id,
-                    'company_id': request.data['company_id'],
-                    'type': request.data['type']
-                 }
-            #рекурсивно добавим права на чтение для родительских компаний
-            set_permission_for_parent_companies(request.data['company_id'], u.id)
+        unit_ids = request.data['units']
+        company_id = request.data['company_id']
+        company = Company.objects.get(id=company_id)
+        permission_type = request.data['permission_type']
+        action = request.data['action']
+        if action:
+            q = Q(unit_id__unit_id__in=unit_ids) & Q(company_id__id=company_id) & Q(type=permission_type)
+            permissions = Permission.objects.filter(q)
+            permissions_exclude = []
+            for p in permissions:
+                permissions_exclude.append(p.unit_id.unit_id)
 
-        elif request.data['substation_id'] is None and request.data['device_id'] is not None:
-            u = Unit.objects.get(unit_id=request.data['device_id'])
-            d = {
-                'unit_id': u.id,
-                'company_id': request.data['company_id'],
-                'type': request.data['type']
-            }
-            set_permission_for_parent_companies(request.data['company_id'], u.id)
+            for unit_id in unit_ids:
+                if unit_id not in permissions_exclude:
+                    u = Unit.objects.get(unit_id=unit_id)
+                    d = {
+                         'unit_id': u.id,
+                         'company_id': company_id,
+                         'type': permission_type
+                        }
+                    serialiser = PermissionSerialiser(data=d)
+                    if serialiser.is_valid():
+                        serialiser.save()
+                    # рекурсивно добавим права на чтение для родительских компаний
+                    set_permission_for_parent_companies(company_id, u.id)
+            q = Q(unit_id__unit_id__in=unit_ids) & Q(company_id__id=company_id) & Q(type=permission_type)
+            permissions = Permission.objects.filter(q)
+            serialiser = PermissionSerialiser(permissions, many=True)
+            return Response(serialiser.data)
+        else:
+            q = Q(unit_id__unit_id__in=unit_ids) & Q(company_id__id=company_id) & Q(type=permission_type)
+            permissions = Permission.objects.filter(q)
+            for perm in permissions:
+                perm.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
 
-        elif request.data['device_id'] is None and request.data['substation_id'] is None:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
-        elif request.data['device_id'] is not None and request.data['substation_id'] is not None:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
-        serialiser = PermissionSerialiser(data=d)
-        if serialiser.is_valid():
-            serialiser.save()
-            return Response(serialiser.data, status=status.HTTP_201_CREATED)
-        return Response(serialiser.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 def set_permission_for_parent_companies(children_company_id, unit_id):
     ch_c = Company.objects.get(id=children_company_id)
     if ch_c.parent_company is not None:
         parent_company_id = ch_c.parent_company.id
-        d_parent = {
+        d = {
             'unit_id': unit_id,
             'company_id': parent_company_id,
             'type': 'Read'
         }
-        serialiser_parent_company = PermissionSerialiser(data=d_parent)
-        if serialiser_parent_company.is_valid():
-            serialiser_parent_company.save()
-            set_permission_for_parent_companies(parent_company_id, unit_id)
+        serialiser = PermissionSerialiser(data=d)
+        if serialiser.is_valid():
+            serialiser.save()
+        set_permission_for_parent_companies(parent_company_id, unit_id)
 
 
 
 
-@api_view(['GET'])
-def api_permissions_by_company_for_substations(request, company_id):
-    company = Company.objects.get(id=company_id)
-    units = company.unit_set.filter(type='Substation')
-    list =[]
-    for u in units:
-        list.append(u.unit_id)
-    substations = Substation.objects.filter(pk__in=list)
-    serialiser = SubstationSerialiser(substations, many=True)
-    return Response(serialiser.data)
+# @api_view(['GET'])
+# def api_permissions_by_company_for_substations(request, company_id):
+#     company = Company.objects.get(id=company_id)
+#     units = company.unit_set.filter(type='Substation')
+#     list =[]
+#     for u in units:
+#         list.append(u.unit_id)
+#     substations = Substation.objects.filter(pk__in=list)
+#     serialiser = SubstationSerialiser(substations, many=True)
+#     return Response(serialiser.data)
 
-# получить компанию текущего пользователя
-@api_view(['GET'])
-def api_my_company(request):
-    pass
 
 @api_view(['GET', 'POST'])
 def api_devices(request):
@@ -232,6 +247,9 @@ def api_equipment(request):
         serialiser = EquipmentSerialiser(data=request.data)
         if serialiser.is_valid():
             serialiser.save()
+            # создаем запись Unit
+            u = Unit(unit_id=serialiser.data['id'], type='Equipment')
+            u.save()
             return Response(serialiser.data, status=status.HTTP_201_CREATED)
         return Response(serialiser.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -259,6 +277,44 @@ def api_equipment_by_switchgear(request, switchgear_id):
     serialiser = EquipmentSerialiser(equipments, many=True)
     return Response(serialiser.data)
 
+@api_view(['POST'])
+def api_create_user(request):
+    login = request.data['login']
+    password = request.data['password']
+    company_id = request.data['company_id']
+    company = Company.objects.get(id=company_id)
+    user = User.objects.create_user(login, password=password, is_staff=True)
+    profile = Profile(company=company, user=user)
+    user.save()
+    profile.save()
+    serialiser = UserSerialiser(user)
+    return Response(serialiser.data)
 
+# получить компанию текущего пользователя
 
+def my_company(user):
+    company = user.profile.company
+    return company
 
+def get_ls_units_with_permission(company, unit_type):
+    user_company = company
+    units = user_company.unit_set.filter(type=unit_type)
+    perms_read_ls = []
+    perms_edit_ls = []
+    for u in units:
+        permissions_read = Permission.objects.filter(unit_id=u).filter(company_id=user_company).filter(type='Read')
+        for pr in permissions_read:
+            perms_read_ls.append(pr.unit_id.unit_id)
+        permissions_edit = Permission.objects.filter(unit_id=u).filter(company_id=user_company).filter(
+            type__in=('Edit', 'Create', 'Delete'))
+        for pe in permissions_edit:
+            perms_edit_ls.append(pe.unit_id.unit_id)
+    unit_read = Unit.objects.filter(unit_id__in=perms_read_ls)
+    unit_edit = Unit.objects.filter(unit_id__in=perms_edit_ls)
+    data = {}
+    for ue in unit_edit:
+        data[ue.unit_id] = 'edit'
+    for ur in unit_read:
+        if ur not in unit_edit:
+            data[ur.unit_id] = 'read'
+    return data

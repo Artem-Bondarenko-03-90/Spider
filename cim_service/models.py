@@ -1,5 +1,6 @@
 from django.db import models
 import uuid
+from django.contrib.auth.models import User
 
 # Substation
 class Substation(models.Model):
@@ -100,6 +101,9 @@ class Equipment(models.Model):
         ('Line', 'ЛЭП'),
     )
     type = models.CharField(max_length=50, choices=TYPES)
+    class Meta:
+        verbose_name = 'Первичное оборудование'
+        verbose_name_plural = 'Первичное оборудование'
 
 #Feeder унаследован от класса Equipment
 class Feeder(Equipment):
@@ -110,5 +114,10 @@ class Feeder(Equipment):
     )
     category = models.IntegerField(choices=CATEGORIES)
     equipment = models.OneToOneField(Equipment, on_delete=models.CASCADE, parent_link=True)
+    class Meta:
+        verbose_name = 'Фидер'
+        verbose_name_plural = 'Фидеры'
 
-
+class Profile(models.Model):
+    company = models.ForeignKey(Company, on_delete=models.PROTECT)
+    user=models.OneToOneField(User, on_delete=models.CASCADE)

@@ -9,9 +9,7 @@ class Migration(migrations.Migration):
 
     initial = True
 
-    dependencies = [
-        ('channels_and_devices_service', '0001_initial'),
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(

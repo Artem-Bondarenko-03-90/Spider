@@ -12,7 +12,7 @@ from rest_framework.response import Response
 
 from cim_service.models import Device
 from .routes import Route
-from ..cim_service.models import Equipment
+from cim_service.models import Equipment
 
 
 @api_view(['GET', 'POST'])
@@ -278,11 +278,13 @@ def api_route_by_node(request, node_id):
     for s in data["segments"]:
         if s["is_start_segment"]:
             start_nodes.append(s["start_node_id"])
-
+    allBranches = []
+    for s in data["segments"]:
+        allBranches.append(s['branch_id'])
     branch_states={}
     for s_n in start_nodes:
         r = Route()
-        for route in getAllRoudsByStartNode(Node.objects.get(id=s_n), [r]):
+        for route in getAllRoudsByStartNode(Node.objects.get(id=s_n), [r], allBranches):
             condition_route=True
             condition_route_2 = True
             routeBranches = []
@@ -374,8 +376,8 @@ def get_out_route_by_device(node, level):
     return segment_list
 
 
-def getAllRoudsByStartNode(node, route_list):
-    q = Q(node__id=node.id) & Q(node_branch__type='direct')
+def getAllRoudsByStartNode(node, route_list, branch_list):
+    q = Q(node__id=node.id) & Q(node_branch__type='direct') & Q(id__in=branch_list)
     out_branches = Branch.objects.filter(q)
     i = 0
     route_list_2 = []
@@ -390,7 +392,7 @@ def getAllRoudsByStartNode(node, route_list):
             route_list.append(r2)
             n = len(route_list)-1
         route_list[n].append(out_br.id)
-        list_next_segments = getAllRoudsByStartNode(next_n, [route_list[n]])
+        list_next_segments = getAllRoudsByStartNode(next_n, [route_list[n]], branch_list)
         i1=0
         for ns in list_next_segments:
             if i1 > 0:

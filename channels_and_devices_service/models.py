@@ -2,16 +2,13 @@ from django.db import models
 import uuid
 
 # Node
-from cim_service.models import Equipment
-
-
 class Node(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=150, null=True)
     local_number = models.PositiveSmallIntegerField(null=True)
     device = models.ForeignKey('cim_service.Device', on_delete=models.PROTECT)
     branches = models.ManyToManyField('Branch', through='Node_Branch', through_fields=('node_id', 'branch_id'))
-    equipments = models.ManyToManyField('Equipment', through='EquipmentControlAction', through_fields=('node_id', 'equipment_id'))
+    equipments = models.ManyToManyField('cim_service.Equipment', through='EquipmentControlAction', through_fields=('node', 'equipment'))
     class Meta:
         verbose_name = 'Узел'
         verbose_name_plural = 'Узлы'
@@ -83,7 +80,7 @@ class Position_Branch(models.Model):
 class EquipmentControlAction(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     node = models.ForeignKey(Node, on_delete=models.CASCADE)
-    equipment = models.ForeignKey(Equipment, on_delete=models.CASCADE)
+    equipment = models.ForeignKey('cim_service.Equipment', on_delete=models.CASCADE)
     ACTION_TYPES = (
         ('turn_on', 'Включение'),
         ('turn_off', 'Отключение'),

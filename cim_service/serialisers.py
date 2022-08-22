@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import Substation, Unit, Company, Permission, Device, Switchgear, Equipment
-
+from django.contrib.auth.models import User
 
 class SubstationSerialiser(serializers.ModelSerializer):
     class Meta:
@@ -20,7 +20,7 @@ class UnitSerialiser(serializers.ModelSerializer):
 class PermissionSerialiser(serializers.ModelSerializer):
     class Meta:
         model = Permission
-        fields = ('id','unit_id','company_id', 'type')
+        fields = ('id', 'unit_id', 'company_id', 'type')
 
 class DeviceSerialiser(serializers.ModelSerializer):
     class Meta:
@@ -36,3 +36,8 @@ class EquipmentSerialiser(serializers.ModelSerializer):
     class Meta:
         model = Equipment
         fields = ('id','name', 'switchgear', 'type')
+
+class UserSerialiser(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ('id','username', 'password')
