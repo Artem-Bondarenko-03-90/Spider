@@ -3,6 +3,7 @@ from django.http import JsonResponse
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+import requests
 
 from .models import Substation, Unit, Company, Permission, Device, Switchgear, Equipment, Profile
 from .serialisers import SubstationSerialiser, CompanySerialiser, DeviceSerialiser, \
@@ -13,8 +14,9 @@ from django.contrib.auth.models import User
 
 @api_view(['GET', 'POST'])
 def api_substations(request):
+    user_company = my_company(request.user)
     if request.method == 'GET':
-        user_company = my_company(request.user)
+
         units_dict = get_ls_units_with_permission(user_company, 'Substation')
         data = {"substations": []}
         for u in units_dict.keys():
@@ -25,7 +27,8 @@ def api_substations(request):
             sub_dict["is_station"] = s.is_station
             sub_dict["permission"] = units_dict[u]
             data["substations"].append(sub_dict)
-        return JsonResponse(data)
+        #return JsonResponse(data)
+        return Response(data, status=status.HTTP_200_OK)
     elif request.method == 'POST':
         serialiser_substation = SubstationSerialiser(data=request.data)
         if serialiser_substation.is_valid():
@@ -33,22 +36,32 @@ def api_substations(request):
             # создаем запись Unit
             u = Unit(unit_id = serialiser_substation.data['id'], type = 'Substation')
             u.save()
-
+            # создаем запись Permission
+            p = Permission(unit_id=u, company_id=user_company, type='Edit')
+            p_dict = {"unit_id": u.id, "company_id": user_company.id, "type": "Edit"}
+            permission_serialiser = PermissionSerialiser(data=p_dict)
+            if permission_serialiser.is_valid():
+                permission_serialiser.save()
+            set_permission_for_parent_companies(user_company.id, u.id)
             return Response(serialiser_substation.data, status=status.HTTP_201_CREATED)
         return Response(serialiser_substation.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET', 'PUT', 'DELETE'])
 def api_substation_detail(request, id):
     substation = Substation.objects.get(id=id)
+    user_company = my_company(request.user)
     if request.method == 'GET':
         serialiser = SubstationSerialiser(substation)
         return Response(serialiser.data)
     elif request.method == 'PUT' or request.method == 'PATCH':
-        serialiser = SubstationSerialiser(substation, data=request.data)
-        if serialiser.is_valid():
-            serialiser.save()
-            return Response(serialiser.data)
-        return Response(serialiser.errors, status=status.HTTP_400_BAD_REQUEST)
+        q = Q(unit_id__unit_id=substation.id) & Q(company_id__id = user_company.id) & Q(type='Edit')
+        if Permission.objects.filter(q):
+            serialiser = SubstationSerialiser(substation, data=request.data)
+            if serialiser.is_valid():
+                serialiser.save()
+                return Response(serialiser.data)
+            return Response(serialiser.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response(status=status.HTTP_403_FORBIDDEN)
     elif request.method == 'DELETE':
         substation.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
