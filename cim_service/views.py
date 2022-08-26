@@ -16,7 +16,6 @@ from django.contrib.auth.models import User
 def api_substations(request):
     user_company = my_company(request.user)
     if request.method == 'GET':
-
         units_dict = get_ls_units_with_permission(user_company, 'Substation')
         data = {"substations": []}
         for u in units_dict.keys():
@@ -27,7 +26,6 @@ def api_substations(request):
             sub_dict["is_station"] = s.is_station
             sub_dict["permission"] = units_dict[u]
             data["substations"].append(sub_dict)
-        #return JsonResponse(data)
         return Response(data, status=status.HTTP_200_OK)
     elif request.method == 'POST':
         serialiser_substation = SubstationSerialiser(data=request.data)
@@ -63,8 +61,13 @@ def api_substation_detail(request, id):
             return Response(serialiser.errors, status=status.HTTP_400_BAD_REQUEST)
         return Response(status=status.HTTP_403_FORBIDDEN)
     elif request.method == 'DELETE':
-        substation.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        q = Q(unit_id__unit_id=substation.id) & Q(company_id__id=user_company.id) & Q(type='Edit')
+        if Permission.objects.filter(q):
+            u = Unit.objects.get(unit_id=substation.id)
+            u.delete()
+            substation.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response(status=status.HTTP_403_FORBIDDEN)
 
 @api_view(['GET', 'POST'])
 def api_companies(request):
@@ -156,25 +159,12 @@ def set_permission_for_parent_companies(children_company_id, unit_id):
         set_permission_for_parent_companies(parent_company_id, unit_id)
 
 
-
-
-# @api_view(['GET'])
-# def api_permissions_by_company_for_substations(request, company_id):
-#     company = Company.objects.get(id=company_id)
-#     units = company.unit_set.filter(type='Substation')
-#     list =[]
-#     for u in units:
-#         list.append(u.unit_id)
-#     substations = Substation.objects.filter(pk__in=list)
-#     serialiser = SubstationSerialiser(substations, many=True)
-#     return Response(serialiser.data)
-
-
 @api_view(['GET', 'POST'])
 def api_devices(request):
     if request.method == 'GET':
         devices = Device.objects.all()
         serialiser = DeviceSerialiser(devices, many=True)
+
         return Response(serialiser.data)
     elif request.method == 'POST':
         serialiser = DeviceSerialiser(data=request.data)
@@ -183,31 +173,57 @@ def api_devices(request):
             # создаем запись Unit
             u = Unit(unit_id = serialiser.data['id'], type = 'Device')
             u.save()
+            # создаем запись Permission
+            p = Permission(unit_id=u, company_id=user_company, type='Edit')
+            p_dict = {"unit_id": u.id, "company_id": user_company.id, "type": "Edit"}
+            permission_serialiser = PermissionSerialiser(data=p_dict)
+            if permission_serialiser.is_valid():
+                permission_serialiser.save()
+            set_permission_for_parent_companies(user_company.id, u.id)
             return Response(serialiser.data, status=status.HTTP_201_CREATED)
         return Response(serialiser.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET', 'PUT', 'DELETE'])
 def api_device_detail(request, id):
     device = Device.objects.get(id=id)
+    user_company = my_company(request.user)
     if request.method == 'GET':
         serialiser = DeviceSerialiser(device)
         return Response(serialiser.data)
     elif request.method == 'PUT' or request.method == 'PATCH':
-        serialiser = DeviceSerialiser(device, data=request.data)
-        if serialiser.is_valid():
-            serialiser.save()
-            return Response(serialiser.data)
-        return Response(serialiser.errors, status=status.HTTP_400_BAD_REQUEST)
+        q = Q(unit_id__unit_id=device.id) & Q(company_id__id=user_company.id) & Q(type='Edit')
+        if Permission.objects.filter(q):
+            serialiser = DeviceSerialiser(device, data=request.data)
+            if serialiser.is_valid():
+                serialiser.save()
+                return Response(serialiser.data)
+            return Response(serialiser.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response(status=status.HTTP_403_FORBIDDEN)
     elif request.method == 'DELETE':
-        device.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        q = Q(unit_id__unit_id=device.id) & Q(company_id__id=user_company.id) & Q(type='Edit')
+        if Permission.objects.filter(q):
+            u = Unit.objects.get(unit_id=device.id)
+            u.delete()
+            device.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response(status=status.HTTP_403_FORBIDDEN)
 
 @api_view(['GET'])
 def api_devices_by_substation(request, substation_id):
+    user_company = my_company(request.user)
     s = Substation.objects.get(id=substation_id)
-    devices = Device.objects.filter(substation = s)
-    serialiser = DeviceSerialiser(devices, many=True)
-    return Response(serialiser.data)
+    units_dict = get_ls_units_with_permission(user_company, 'Device')
+    data = {"devices": []}
+    devices = Device.objects.filter(substation=s)
+    for d in devices:
+        if d.id in units_dict.keys():
+            device_dict = {}
+            device_dict["id"] = d.id
+            device_dict["name"] = d.name
+            device_dict["is_station"] = d.type
+            device_dict["permission"] = units_dict[d.id]
+            data["devices"].append(device_dict)
+    return Response(data, status=status.HTTP_200_OK)
 
 
 @api_view(['GET', 'POST'])
